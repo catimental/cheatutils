@@ -7,7 +7,6 @@ import com.zergatul.cheatutils.scripting.ApiVisibility;
 import com.zergatul.cheatutils.scripting.ApiType;
 import com.zergatul.cheatutils.scripting.types.Position3d;
 import com.zergatul.cheatutils.scripting.types.BlockPosWrapper;
-import com.zergatul.cheatutils.utils.InputBuilder;
 import com.zergatul.cheatutils.utils.NearbyBlockEnumerator;
 import com.zergatul.cheatutils.utils.Rotation;
 import com.zergatul.cheatutils.utils.RotationUtils;
@@ -26,7 +25,6 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.entity.vehicle.ChestBoat;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -604,14 +602,12 @@ public class PlayerApi {
                     return;
                 }
 
-                Input oldInput = mc.player.input.keyPresses;
-                mc.player.input.keyPresses = new InputBuilder(oldInput).shift(true).build();
-
+                boolean oldShiftKeyDown = mc.player.input.shiftKeyDown;
+                mc.player.input.shiftKeyDown = true;
                 mc.gameMode.interactAt(mc.player, target, new EntityHitResult(target), InteractionHand.MAIN_HAND);
                 mc.gameMode.interact(mc.player, target, InteractionHand.MAIN_HAND);
                 mc.player.swing(InteractionHand.MAIN_HAND);
-
-                mc.player.input.keyPresses = oldInput;
+                mc.player.input.shiftKeyDown = oldShiftKeyDown;
             }
         }
 
@@ -634,17 +630,22 @@ public class PlayerApi {
             assert mc.player != null;
             assert mc.gameMode != null;
 
-            // copy from Minecraft.startUseItem
-            InteractionResult result = mc.gameMode.interactAt(mc.player, entity, new EntityHitResult(entity), hand);
-            if (!result.consumesAction()) {
-                result = mc.gameMode.interact(mc.player, entity, hand);
-            }
+//            // copy from Minecraft.startUseItem
+//            InteractionResult result = mc.gameMode.interactAt(mc.player, entity, new EntityHitResult(entity), hand);
+//            if (!result.consumesAction()) {
+//                result = mc.gameMode.interact(mc.player, entity, hand);
+//            }
+//
+//            if (result instanceof InteractionResult.Success success) {
+//                if (success.swingSource() == InteractionResult.SwingSource.CLIENT) {
+//                    mc.player.swing(hand);
+//                }
+//            }
 
-            if (result instanceof InteractionResult.Success success) {
-                if (success.swingSource() == InteractionResult.SwingSource.CLIENT) {
-                    mc.player.swing(hand);
-                }
-            }
+            //이정도만해도될듯?
+            mc.gameMode.interactAt(mc.player, entity, new EntityHitResult(entity), InteractionHand.MAIN_HAND);
+            mc.gameMode.interact(mc.player, entity, InteractionHand.MAIN_HAND);
+            mc.player.swing(InteractionHand.MAIN_HAND);
         }
     }
 }

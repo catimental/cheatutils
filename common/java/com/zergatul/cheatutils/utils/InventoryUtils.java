@@ -52,26 +52,27 @@ public class InventoryUtils {
             return;
         }
 
+
         ItemStack fromItemStack = fromSlot.get();
         ItemStack toItemStack = toSlot.get();
-        Int2ObjectMap<HashedStack> int2objectmap = new Int2ObjectOpenHashMap<>();
-        int2objectmap.put(fromSlot.toMenuIndex(), toHashed(toItemStack));
-        int2objectmap.put(toSlot.toMenuIndex(), toHashed(fromItemStack));
+        Int2ObjectMap<ItemStack> int2objectmap = new Int2ObjectOpenHashMap<>();
+        int2objectmap.put(fromSlot.toMenuIndex(), toItemStack);
+        int2objectmap.put(toSlot.toMenuIndex(), fromItemStack);
         NetworkPacketsController.instance.sendPacket(new ServerboundContainerClickPacket(
                 0, // containerId
                 mc.player.inventoryMenu.getStateId(),
                 fromSlot.toMenuIndex(),
-                (byte) toSlot.toInventoryIndex(), // buttonNum
+                toSlot.toInventoryIndex(), // buttonNum
                 ClickType.SWAP,
-                int2objectmap,
-                toHashed(new ItemStack(Items.AIR, 1))));
+                new ItemStack(Items.AIR, 1),
+                int2objectmap));
 
         fromSlot.set(toItemStack);
         toSlot.set(fromItemStack);
     }
 
     public static void dropItemStacks(List<InventorySlot> slots) {
-        if (slots == null || slots.isEmpty()) {
+        if (slots == null || slots.size() == 0) {
             return;
         }
 
@@ -82,17 +83,28 @@ public class InventoryUtils {
         for (InventorySlot slot: slots) {
             ItemStack air = new ItemStack(Items.AIR, 1);
             ItemStack fromItemStack = slot.get();
-            sendPacket(slot, fromItemStack, slot, air);
+            Int2ObjectMap<ItemStack> int2objectmap = new Int2ObjectOpenHashMap<>();
+            int2objectmap.put(slot.toMenuIndex(), air);
+            NetworkPacketsController.instance.sendPacket(new ServerboundContainerClickPacket(
+                    0, // containerId
+                    mc.player.inventoryMenu.getStateId(),
+                    slot.toMenuIndex(),
+                    0, // buttonNum
+                    ClickType.PICKUP,
+                    fromItemStack,
+                    int2objectmap
+            ));
             slot.set(air);
 
             NetworkPacketsController.instance.sendPacket(new ServerboundContainerClickPacket(
                     0, // containerId
                     mc.player.inventoryMenu.getStateId(),
-                    (short) -999, // slotNum
-                    (byte) 0, // buttonNum
+                    -999, // slotNum
+                    0, // buttonNum
                     ClickType.PICKUP,
-                    new Int2ObjectOpenHashMap<>(),
-                    toHashed(air)));
+                    air,
+                    new Int2ObjectOpenHashMap<>()
+            ));
         }
 
         if (!(mc.screen instanceof InventoryScreen)) {
@@ -109,20 +121,40 @@ public class InventoryUtils {
             return;
         }
 
-        if (!destItemStack.isEmpty() && !ItemStack.isSameItemSameComponents(sourceItemStack, destItemStack)) {
+        if (!destItemStack.isEmpty() && !ItemStack.isSameItemSameTags(sourceItemStack, destItemStack)) {
             return;
         }
 
         // pickup source slot
         ItemStack air = new ItemStack(Items.AIR, 1);
-        sendPacket(fromSlot, sourceItemStack, fromSlot, air);
+        Int2ObjectMap<ItemStack> int2objectmap = new Int2ObjectOpenHashMap<>();
+        int2objectmap.put(fromSlot.toMenuIndex(), air);
+        NetworkPacketsController.instance.sendPacket(new ServerboundContainerClickPacket(
+                0, // containerId
+                mc.player.inventoryMenu.getStateId(),
+                fromSlot.toMenuIndex(),
+                0, // buttonNum
+                ClickType.PICKUP,
+                sourceItemStack,
+                int2objectmap
+        ));
         fromSlot.set(air);
 
         int total = sourceItemStack.getCount() + destItemStack.getCount();
         if (total <= stackSize) {
             // click on destination
             ItemStack newDestItemStack = destItemStack.copyWithCount(total);
-            sendPacket(toSlot, air, toSlot, newDestItemStack);
+            int2objectmap = new Int2ObjectOpenHashMap<>();
+            int2objectmap.put(toSlot.toMenuIndex(), newDestItemStack);
+            NetworkPacketsController.instance.sendPacket(new ServerboundContainerClickPacket(
+                    0, // containerId
+                    mc.player.inventoryMenu.getStateId(),
+                    toSlot.toMenuIndex(),
+                    0, // buttonNum
+                    ClickType.PICKUP,
+                    air,
+                    int2objectmap
+            ));
             toSlot.set(newDestItemStack);
         } else {
             int remainder = total - stackSize;
@@ -130,11 +162,31 @@ public class InventoryUtils {
             // click on destination
             ItemStack newDestItemStack = destItemStack.copyWithCount(stackSize);
             ItemStack remainderItemStack = destItemStack.copyWithCount(remainder);
-            sendPacket(toSlot, remainderItemStack, toSlot, newDestItemStack);
+            int2objectmap = new Int2ObjectOpenHashMap<>();
+            int2objectmap.put(toSlot.toMenuIndex(), newDestItemStack);
+            NetworkPacketsController.instance.sendPacket(new ServerboundContainerClickPacket(
+                    0, // containerId
+                    mc.player.inventoryMenu.getStateId(),
+                    toSlot.toMenuIndex(),
+                    0, // buttonNum
+                    ClickType.PICKUP,
+                    remainderItemStack,
+                    int2objectmap
+            ));
             toSlot.set(newDestItemStack);
 
             // click on source
-            sendPacket(toSlot, air, fromSlot, remainderItemStack);
+            int2objectmap = new Int2ObjectOpenHashMap<>();
+            int2objectmap.put(fromSlot.toMenuIndex(), remainderItemStack);
+            NetworkPacketsController.instance.sendPacket(new ServerboundContainerClickPacket(
+                    0, // containerId
+                    mc.player.inventoryMenu.getStateId(),
+                    fromSlot.toMenuIndex(),
+                    0, // buttonNum
+                    ClickType.PICKUP,
+                    air,
+                    int2objectmap
+            ));
             fromSlot.set(remainderItemStack);
         }
     }

@@ -1,7 +1,6 @@
 package com.zergatul.cheatutils.common.events;
 
 import net.minecraft.client.Camera;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Mth;
@@ -20,10 +19,11 @@ public class RenderWorldLastEvent {
     private final Vec3 playerPos;
     private final Camera camera;
 
-    public RenderWorldLastEvent(Matrix4f pose, Matrix4f projection, DeltaTracker delta) {
+    public RenderWorldLastEvent(Matrix4f pose, Matrix4f projection, float delta) {
         this.pose = new Matrix4f(pose);
         this.projection = new Matrix4f(projection);
-        this.tickDelta = delta.getGameTimeDeltaPartialTick(true);
+//        this.tickDelta = delta.getGameTimeDeltaPartialTick(true);
+        this.tickDelta = delta;
 
         this.mvp = new Matrix4f(projection).mul(pose);
 

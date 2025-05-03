@@ -13,9 +13,8 @@ import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.client.CameraType;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.ClientInput;
+import net.minecraft.client.player.Input;
 import net.minecraft.client.player.KeyboardInput;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
@@ -44,8 +43,8 @@ public class FreeCam implements Module {
     private final FreeCamPath path = new FreeCamPath(this);
     private boolean active;
     private CameraType oldCameraType;
-    private ClientInput playerInput;
-    private ClientInput freecamInput;
+    private Input playerInput;
+    private Input freecamInput;
     private double x, y, z;
     private float yRot, xRot;
     private double forwardVelocity;
@@ -167,13 +166,14 @@ public class FreeCam implements Module {
         followCamera = false;
         oldCameraType = mc.options.getCameraType();
         playerInput = new KeyboardInput(mc.options); //mc.player.input; // changed for baritone compat
-        mc.player.input = freecamInput = new ClientInput();
+        mc.player.input = freecamInput = new Input();
         mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
         if (oldCameraType.isFirstPerson() != mc.options.getCameraType().isFirstPerson()) {
             mc.gameRenderer.checkEntityPostEffect(mc.options.getCameraType().isFirstPerson() ? mc.getCameraEntity() : null);
         }
 
-        float frameTime = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+//        float frameTime = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
+        float frameTime = mc.getFrameTime();
         Vec3 pos = entity.getEyePosition(frameTime);
         x = pos.x;
         y = pos.y;
@@ -242,7 +242,7 @@ public class FreeCam implements Module {
         }
     }
 
-    private void onRenderTickStart(DeltaTracker delta) {
+    private void onRenderTickStart(net.minecraft.client.Timer delta) {
         if (!active) {
             return;
         }
@@ -272,16 +272,17 @@ public class FreeCam implements Module {
         } else if (followCamera) {
             Entity entity = mc.getCameraEntity();
             if (entity != null) {
-                Vec3 pos = entity.getEyePosition(delta.getGameTimeDeltaPartialTick(true));
+//                Vec3 pos = entity.getEyePosition(delta.getGameTimeDeltaPartialTick(true));
+                Vec3 pos = entity.getEyePosition(delta.partialTick);
                 x = pos.x + followDeltaX;
                 y = pos.y + followDeltaY;
                 z = pos.z + followDeltaZ;
             }
         } else {
-            ClientInput input = playerInput;
-            float forwardImpulse = !cameraLock ? (input.keyPresses.forward() ? 1 : 0) + (input.keyPresses.backward() ? -1 : 0) : 0;
-            float leftImpulse = !cameraLock ? (input.keyPresses.left() ? 1 : 0) + (input.keyPresses.right() ? -1 : 0) : 0;
-            float upImpulse = !cameraLock ? ((input.keyPresses.jump() ? 1 : 0) + (input.keyPresses.shift() ? -1 : 0)) : 0;
+            Input input = playerInput;
+            float forwardImpulse = !cameraLock ? (input.up ? 1 : 0) + (input.down ? -1 : 0) : 0;
+            float leftImpulse = !cameraLock ? (input.left ? 1 : 0) + (input.right ? -1 : 0) : 0;
+            float upImpulse = !cameraLock ? ((input.jumping ? 1 : 0) + (input.shiftKeyDown ? -1 : 0)) : 0;
             double slowdown = Math.pow(config.slowdownFactor, frameTime);
             forwardVelocity = combineMovement(forwardVelocity, forwardImpulse, frameTime, config.acceleration, slowdown);
             leftVelocity = combineMovement(leftVelocity, leftImpulse, frameTime, config.acceleration, slowdown);
@@ -308,7 +309,8 @@ public class FreeCam implements Module {
             z += dz;
         }
 
-        applyEyeLock(delta.getGameTimeDeltaPartialTick(true));
+//        applyEyeLock(delta.getGameTimeDeltaPartialTick(true));
+        applyEyeLock(delta.partialTick);
     }
 
     private void onClientTickStart() {
@@ -316,7 +318,8 @@ public class FreeCam implements Module {
             while (mc.options.keyTogglePerspective.consumeClick()) {
                 // consume clicks
             }
-            playerInput.tick();
+//            playerInput.tick();
+            playerInput.tick(false, 0);
         }
     }
 

@@ -9,7 +9,6 @@
   },
   "mixinPriority": 500,
   "client": [
-    "common.accessors.AbstractRecipeBookScreenAccessor",
     "common.accessors.BlockBehaviourAccessor",
     "common.accessors.ChunkAccessAccessor",
     "common.accessors.ClientChunkCacheAccessor",

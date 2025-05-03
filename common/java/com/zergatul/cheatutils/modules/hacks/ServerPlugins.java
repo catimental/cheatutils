@@ -10,7 +10,7 @@ import com.zergatul.cheatutils.modules.Module;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.contents.PlainTextContents;
+import net.minecraft.network.chat.contents.LiteralContents;
 import net.minecraft.network.protocol.game.ClientboundCommandSuggestionsPacket;
 import net.minecraft.network.protocol.game.ServerboundCommandSuggestionPacket;
 import org.apache.logging.log4j.LogManager;
@@ -127,24 +127,24 @@ public class ServerPlugins implements Module {
 
     private void onServerPacket(NetworkPacketsController.ServerPacketArgs args) {
         if (args.packet instanceof ClientboundCommandSuggestionsPacket packet) {
-            if (state == State.SENT_PACKET && suggestionId == packet.id()) {
+            if (state == State.SENT_PACKET && suggestionId == packet.getId()) {
                 state = State.RECEIVED_PACKET;
-                List<ClientboundCommandSuggestionsPacket.Entry> suggestions = packet.suggestions();
-                plugins = suggestions.stream().map(ClientboundCommandSuggestionsPacket.Entry::text).toArray(String[]::new);
+                Suggestions suggestions = packet.getSuggestions();
+                plugins = suggestions.getList().stream().map(Suggestion::getText).toArray(String[]::new);
                 if (ConfigStore.instance.getConfig().serverPluginsConfig.autoPrint) {
                     for (String plugin: plugins) {
-                        mc.getChatListener().handleSystemMessage(MutableComponent.create(new PlainTextContents.LiteralContents(plugin)), false);
+                        mc.getChatListener().handleSystemMessage(MutableComponent.create(new LiteralContents(plugin)), false);
                     }
                 }
             }
 
-            if (bukkitState == State.SENT_PACKET && bukkitSuggestionId == packet.id()) {
+            if (bukkitState == State.SENT_PACKET && bukkitSuggestionId == packet.getId()) {
                 bukkitState = State.RECEIVED_PACKET;
-                List<ClientboundCommandSuggestionsPacket.Entry> suggestions = packet.suggestions();
-                bukkitPlugins = suggestions.stream().map(ClientboundCommandSuggestionsPacket.Entry::text).toArray(String[]::new);
+                Suggestions suggestions = packet.getSuggestions();
+                bukkitPlugins = suggestions.getList().stream().map(Suggestion::getText).toArray(String[]::new);
                 if (ConfigStore.instance.getConfig().serverPluginsConfig.autoPrint) {
                     for (String plugin: bukkitPlugins) {
-                        mc.getChatListener().handleSystemMessage(MutableComponent.create(new PlainTextContents.LiteralContents(plugin)), false);
+                        mc.getChatListener().handleSystemMessage(MutableComponent.create(new LiteralContents(plugin)), false);
                     }
                 }
             }

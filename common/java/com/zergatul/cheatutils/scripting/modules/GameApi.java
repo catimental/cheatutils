@@ -404,26 +404,26 @@ public class GameApi {
             return getIntegerArrayValue(entityId, entity -> entity.getPassengers().stream().mapToInt(Entity::getId).toArray());
         }
 
-        public boolean hasEffectByColor(int entityId, String color) {
-            return getBooleanValue(entityId, entity -> {
-                if (entity instanceof LivingEntityExtension living) {
-                    Integer value = ColorUtils.parseColor(color);
-                    if (value == null) {
-                        return false;
-                    }
-                    for (ParticleOptions option : living.getParticles_CU()) {
-                        if (option instanceof ColorParticleOptionAccessor colorOption) {
-                            if ((colorOption.getColor_CU() & 0xFFFFFF) == (value & 0xFFFFFF)) {
-                                return true;
-                            }
-                        }
-                    }
-                }
-                return false;
-            });
-        }
+//        public boolean hasEffectByColor(int entityId, String color) {
+//            return getBooleanValue(entityId, entity -> {
+//                if (entity instanceof LivingEntityExtension living) {
+//                    Integer value = ColorUtils.parseColor(color);
+//                    if (value == null) {
+//                        return false;
+//                    }
+//                    for (ParticleOptions option : living.getParticles_CU()) {
+//                        if (option instanceof ColorParticleOptionAccessor colorOption) {
+//                            if ((colorOption.getColor_CU() & 0xFFFFFF) == (value & 0xFFFFFF)) {
+//                                return true;
+//                            }
+//                        }
+//                    }
+//                }
+//                return false;
+//            });
+//        }
 
-        @MethodDescription("""
+        /*@MethodDescription("""
                 Checks if entity emits particle with the same color as color defined for specified effect
                 """)
         public boolean hasEffectById(int entityId, String effectId) {
@@ -459,7 +459,7 @@ public class GameApi {
                 }
                 return false;
             });
-        }
+        }*/
 
         public ItemStackWrapper getEquippedHeadItem(int entityId) {
             return getValue(entityId, getEquippedItem(EquipmentSlot.HEAD), () -> new ItemStackWrapper(ItemStack.EMPTY));
@@ -535,7 +535,7 @@ public class GameApi {
             });
         }
 
-        @MethodDescription("""
+        /*@MethodDescription("""
                 Checks few simple spawn rules for mob type at specified coordinates.
                 This method doesn't check:
                  - light conditions
@@ -555,7 +555,7 @@ public class GameApi {
                 return false;
             }
             return mc.level.noBlockCollision(null, type.getSpawnAABB(x + 0.5, y, z + 0.5));
-        }
+        }*/
 
         @MethodDescription("""
                 Returns bounding box (or hitbox in other words) for specified entity

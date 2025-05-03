@@ -14,8 +14,6 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -182,23 +180,24 @@ public class ContainersApi {
         }
     }
 
-    private String[] getEnchantmentIds(ItemEnchantments enchantments) {
-        List<String> ids = new ArrayList<>();
-        for (Holder<Enchantment> holder : enchantments.keySet()) {
-            holder.unwrapKey().ifPresent(enchantment -> ids.add(enchantment.location().toString()));
-            return ids.toArray(String[]::new);
-        }
-        return new String[0];
-    }
-
-    private int[] getEnchantmentLevels(ItemEnchantments enchantments) {
-        List<Integer> levels = new ArrayList<>();
-        for (Holder<Enchantment> holder : enchantments.keySet()) {
-            if (holder.unwrapKey().isPresent()) {
-                levels.add(enchantments.getLevel(holder));
-            }
-            return levels.stream().mapToInt(Integer::intValue).toArray();
-        }
-        return new int[0];
-    }
+    //todo remake this
+//    private String[] getEnchantmentIds(ItemEnchantments enchantments) {
+//        List<String> ids = new ArrayList<>();
+//        for (Holder<Enchantment> holder : enchantments.keySet()) {
+//            holder.unwrapKey().ifPresent(enchantment -> ids.add(enchantment.location().toString()));
+//            return ids.toArray(String[]::new);
+//        }
+//        return new String[0];
+//    }
+//
+//    private int[] getEnchantmentLevels(ItemEnchantments enchantments) {
+//        List<Integer> levels = new ArrayList<>();
+//        for (Holder<Enchantment> holder : enchantments.keySet()) {
+//            if (holder.unwrapKey().isPresent()) {
+//                levels.add(enchantments.getLevel(holder));
+//            }
+//            return levels.stream().mapToInt(Integer::intValue).toArray();
+//        }
+//        return new int[0];
+//    }
 }

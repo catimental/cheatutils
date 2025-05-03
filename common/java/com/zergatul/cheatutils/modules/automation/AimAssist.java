@@ -9,7 +9,6 @@ import com.zergatul.cheatutils.modules.Module;
 import com.zergatul.cheatutils.utils.Rotation;
 import com.zergatul.cheatutils.utils.RotationUtils;
 import com.zergatul.cheatutils.utils.ServerBehavior;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.protocol.game.ServerboundMovePlayerPacket;
@@ -117,13 +116,14 @@ public class AimAssist implements Module {
         }
     }
 
-    private void onRenderTickStart(DeltaTracker delta) {
+    private void onRenderTickStart(net.minecraft.client.Timer delta) {
         if (mc.player == null || !isTargetLockEnabled) {
             targetLockEntity = null;
             return;
         }
 
-        float partialTicks = delta.getGameTimeDeltaPartialTick(true);
+//        float partialTicks = delta.getGameTimeDeltaPartialTick(true);
+        float partialTicks = delta.partialTick;
         if (targetLockEntity == null) {
             Rotation rotation = new Rotation(mc.player.getXRot(partialTicks), mc.player.getYRot(partialTicks));
             targetLockEntity = findTarget(rotation);

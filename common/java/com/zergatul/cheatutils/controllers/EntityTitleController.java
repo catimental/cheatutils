@@ -3,7 +3,7 @@ package com.zergatul.cheatutils.controllers;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.mojang.authlib.yggdrasil.ProfileResult;
+import com.mojang.authlib.GameProfile;
 import com.zergatul.cheatutils.collections.ImmutableList;
 import com.zergatul.cheatutils.common.Events;
 import com.zergatul.cheatutils.concurrent.TickEndExecutor;
@@ -25,6 +25,8 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Holder;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
@@ -35,8 +37,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
@@ -62,11 +64,12 @@ public class EntityTitleController {
                 @Override
                 public Optional<String> load(UUID uuid) {
                     CompletableFuture.runAsync(() -> {
-                        ProfileResult result = Minecraft.getInstance().getMinecraftSessionService().fetchProfile(uuid, false);
-                        if (result == null) {
+                        GameProfile playerProfile = new GameProfile(uuid, null);
+                        playerProfile = Minecraft.getInstance().getMinecraftSessionService().fillProfileProperties(playerProfile, false);
+                        if (playerProfile.getName() == null) {
                             usernameCache.put(uuid, Optional.of(uuid.toString()));
                         } else {
-                            usernameCache.put(uuid, Optional.of(result.profile().getName()));
+                            usernameCache.put(uuid, Optional.of(playerProfile.getName()));
                         }
                     });
                     return Optional.of("loading...");
@@ -428,26 +431,25 @@ public class EntityTitleController {
             return List.of();
         }
 
-        List<EnchantmentEntry> result = new ArrayList<>();
-        ItemEnchantments enchantments = itemStack.getEnchantments();
-        for (Holder<Enchantment> holder : enchantments.keySet()) {
-            ResourceLocation id = holder.unwrapKey().get().location();
-            int level = enchantments.getLevel(holder);
-            result.add(new EnchantmentEntry(id, level));
+        List<EnchantmentEntry> enchantments = new ArrayList<>();
+        ListTag list = itemStack.getEnchantmentTags();
+        for(int i = 0; i < list.size(); ++i) {
+            CompoundTag compound = list.getCompound(i);
+            ResourceLocation id = EnchantmentHelper.getEnchantmentId(compound);
+            int level = EnchantmentHelper.getEnchantmentLevel(compound);
+            enchantments.add(new EnchantmentEntry(id, level));
         }
 
-        result.sort(Comparator.comparingInt(e -> e.priority));
-        return result;
+        enchantments.sort(Comparator.comparingInt(e -> e.priority));
+        return enchantments;
     }
 
     private UUID getOwner(Entity entity) {
         if (entity instanceof TamableAnimal animal) {
-            EntityReference<LivingEntity> reference = animal.getOwnerReference();
-            return reference != null ? reference.getUUID() : null;
+            return animal.getOwnerUUID();
         }
         if (entity instanceof AbstractHorse horse) {
-            EntityReference<LivingEntity> reference = horse.getOwnerReference();
-            return reference != null ? reference.getUUID() : null;
+            return horse.getOwnerUUID();
         }
         if (entity instanceof Projectile projectile) {
             ProjectileAccessor projectileMixin = (ProjectileAccessor) projectile;
@@ -470,56 +472,53 @@ public class EntityTitleController {
 
     private static class EnchantmentEntry {
 
-        private static final Map<ResourceLocation, EnchantmentDisplayEntry> displayMap = Map.ofEntries(
-                Map.entry(Enchantments.PROTECTION.location(), new EnchantmentDisplayEntry("Pr")),
-                Map.entry(Enchantments.FIRE_PROTECTION.location(), new EnchantmentDisplayEntry("FP")),
-                Map.entry(Enchantments.BLAST_PROTECTION.location(), new EnchantmentDisplayEntry("BP")),
-                Map.entry(Enchantments.PROJECTILE_PROTECTION.location(), new EnchantmentDisplayEntry("PP")),
+        private static final Map<Enchantment, EnchantmentDisplayEntry> displayMap = Map.ofEntries(
+                Map.entry(Enchantments.ALL_DAMAGE_PROTECTION, new EnchantmentDisplayEntry("Pr")),
+                Map.entry(Enchantments.FIRE_PROTECTION, new EnchantmentDisplayEntry("FP")),
+                Map.entry(Enchantments.BLAST_PROTECTION, new EnchantmentDisplayEntry("BP")),
+                Map.entry(Enchantments.PROJECTILE_PROTECTION, new EnchantmentDisplayEntry("PP")),
 
-                Map.entry(Enchantments.THORNS.location(), new EnchantmentDisplayEntry("Th")),
+                Map.entry(Enchantments.THORNS, new EnchantmentDisplayEntry("Th")),
 
-                Map.entry(Enchantments.FEATHER_FALLING.location(), new EnchantmentDisplayEntry("Fe")),
-                Map.entry(Enchantments.RESPIRATION.location(), new EnchantmentDisplayEntry("Re")),
-                Map.entry(Enchantments.AQUA_AFFINITY.location(), new EnchantmentDisplayEntry("Aq")),
-                Map.entry(Enchantments.DEPTH_STRIDER.location(), new EnchantmentDisplayEntry("De")),
-                Map.entry(Enchantments.FROST_WALKER.location(), new EnchantmentDisplayEntry("Fr")),
-                Map.entry(Enchantments.SOUL_SPEED.location(), new EnchantmentDisplayEntry("So")),
-                Map.entry(Enchantments.SWIFT_SNEAK.location(), new EnchantmentDisplayEntry("Sn")),
+                Map.entry(Enchantments.FALL_PROTECTION, new EnchantmentDisplayEntry("Fe")),
+                Map.entry(Enchantments.RESPIRATION, new EnchantmentDisplayEntry("Re")),
+                Map.entry(Enchantments.AQUA_AFFINITY, new EnchantmentDisplayEntry("Aq")),
+                Map.entry(Enchantments.DEPTH_STRIDER, new EnchantmentDisplayEntry("De")),
+                Map.entry(Enchantments.FROST_WALKER, new EnchantmentDisplayEntry("Fr")),
+                Map.entry(Enchantments.SOUL_SPEED, new EnchantmentDisplayEntry("So")),
+                Map.entry(Enchantments.SWIFT_SNEAK, new EnchantmentDisplayEntry("Sn")),
 
-                Map.entry(Enchantments.SHARPNESS.location(), new EnchantmentDisplayEntry("Sh")),
-                Map.entry(Enchantments.SMITE.location(), new EnchantmentDisplayEntry("Sm")),
-                Map.entry(Enchantments.BANE_OF_ARTHROPODS.location(), new EnchantmentDisplayEntry("Ar")),
-                Map.entry(Enchantments.FIRE_ASPECT.location(), new EnchantmentDisplayEntry("Fi")),
-                Map.entry(Enchantments.KNOCKBACK.location(), new EnchantmentDisplayEntry("Kn")),
-                Map.entry(Enchantments.LOOTING.location(), new EnchantmentDisplayEntry("Lo")),
-                Map.entry(Enchantments.SWEEPING_EDGE.location(), new EnchantmentDisplayEntry("Sw")),
-                Map.entry(Enchantments.DENSITY.location(), new EnchantmentDisplayEntry("Dn")),
-                Map.entry(Enchantments.BREACH.location(), new EnchantmentDisplayEntry("Br")),
-                Map.entry(Enchantments.WIND_BURST.location(), new EnchantmentDisplayEntry("Wi")),
+                Map.entry(Enchantments.SHARPNESS, new EnchantmentDisplayEntry("Sh")),
+                Map.entry(Enchantments.SMITE, new EnchantmentDisplayEntry("Sm")),
+                Map.entry(Enchantments.BANE_OF_ARTHROPODS, new EnchantmentDisplayEntry("Ar")),
+                Map.entry(Enchantments.FIRE_ASPECT, new EnchantmentDisplayEntry("Fi")),
+                Map.entry(Enchantments.KNOCKBACK, new EnchantmentDisplayEntry("Kn")),
+                Map.entry(Enchantments.MOB_LOOTING, new EnchantmentDisplayEntry("Lo")),
+                Map.entry(Enchantments.SWEEPING_EDGE, new EnchantmentDisplayEntry("Sw")),
 
-                Map.entry(Enchantments.SILK_TOUCH.location(), new EnchantmentDisplayEntry("Si")),
-                Map.entry(Enchantments.FORTUNE.location(), new EnchantmentDisplayEntry("Fo")),
-                Map.entry(Enchantments.EFFICIENCY.location(), new EnchantmentDisplayEntry("Ef")),
+                Map.entry(Enchantments.SILK_TOUCH, new EnchantmentDisplayEntry("Si")),
+                Map.entry(Enchantments.BLOCK_FORTUNE, new EnchantmentDisplayEntry("Fo")),
+                Map.entry(Enchantments.BLOCK_EFFICIENCY, new EnchantmentDisplayEntry("Ef")),
 
-                Map.entry(Enchantments.POWER.location(), new EnchantmentDisplayEntry("Po")),
-                Map.entry(Enchantments.PUNCH.location(), new EnchantmentDisplayEntry("Pu")),
-                Map.entry(Enchantments.INFINITY.location(), new EnchantmentDisplayEntry("In")),
-                Map.entry(Enchantments.FLAME.location(), new EnchantmentDisplayEntry("Fl")),
-                Map.entry(Enchantments.LUCK_OF_THE_SEA.location(), new EnchantmentDisplayEntry("Lc")),
-                Map.entry(Enchantments.LURE.location(), new EnchantmentDisplayEntry("Lr")),
-                Map.entry(Enchantments.LOYALTY.location(), new EnchantmentDisplayEntry("Lo")),
-                Map.entry(Enchantments.IMPALING.location(), new EnchantmentDisplayEntry("Im")),
-                Map.entry(Enchantments.RIPTIDE.location(), new EnchantmentDisplayEntry("Ri")),
-                Map.entry(Enchantments.CHANNELING.location(), new EnchantmentDisplayEntry("Ch")),
-                Map.entry(Enchantments.MULTISHOT.location(), new EnchantmentDisplayEntry("Mu")),
-                Map.entry(Enchantments.QUICK_CHARGE.location(), new EnchantmentDisplayEntry("Qu")),
-                Map.entry(Enchantments.PIERCING.location(), new EnchantmentDisplayEntry("Pi")),
+                Map.entry(Enchantments.POWER_ARROWS, new EnchantmentDisplayEntry("Po")),
+                Map.entry(Enchantments.PUNCH_ARROWS, new EnchantmentDisplayEntry("Pu")),
+                Map.entry(Enchantments.INFINITY_ARROWS, new EnchantmentDisplayEntry("In")),
+                Map.entry(Enchantments.FLAMING_ARROWS, new EnchantmentDisplayEntry("Fl")),
+                Map.entry(Enchantments.FISHING_LUCK, new EnchantmentDisplayEntry("Lc")),
+                Map.entry(Enchantments.FISHING_SPEED, new EnchantmentDisplayEntry("Lr")),
+                Map.entry(Enchantments.LOYALTY, new EnchantmentDisplayEntry("Lo")),
+                Map.entry(Enchantments.IMPALING, new EnchantmentDisplayEntry("Im")),
+                Map.entry(Enchantments.RIPTIDE, new EnchantmentDisplayEntry("Ri")),
+                Map.entry(Enchantments.CHANNELING, new EnchantmentDisplayEntry("Ch")),
+                Map.entry(Enchantments.MULTISHOT, new EnchantmentDisplayEntry("Mu")),
+                Map.entry(Enchantments.QUICK_CHARGE, new EnchantmentDisplayEntry("Qu")),
+                Map.entry(Enchantments.PIERCING, new EnchantmentDisplayEntry("Pi")),
 
-                Map.entry(Enchantments.UNBREAKING.location(), new EnchantmentDisplayEntry("Un")),
+                Map.entry(Enchantments.UNBREAKING, new EnchantmentDisplayEntry("Un")),
 
-                Map.entry(Enchantments.MENDING.location(), new EnchantmentDisplayEntry("Me")),
-                Map.entry(Enchantments.VANISHING_CURSE.location(), new EnchantmentDisplayEntry("Va", Color.RED)),
-                Map.entry(Enchantments.BINDING_CURSE.location(), new EnchantmentDisplayEntry("Bi", Color.RED)));
+                Map.entry(Enchantments.MENDING, new EnchantmentDisplayEntry("Me")),
+                Map.entry(Enchantments.VANISHING_CURSE, new EnchantmentDisplayEntry("Va", Color.RED)),
+                Map.entry(Enchantments.BINDING_CURSE, new EnchantmentDisplayEntry("Bi", Color.RED)));
 
         public final String text;
         public final int level;

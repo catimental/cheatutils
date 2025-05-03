@@ -14,13 +14,11 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.BundleItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.BundleContents;
 import org.joml.Matrix4f;
 
 import java.util.ArrayList;
@@ -56,15 +54,16 @@ public class ContainerSummaryController {
                 }
             }
 
-            if (itemStack.getItem() instanceof BundleItem) {
-                BundleContents contents = itemStack.get(DataComponents.BUNDLE_CONTENTS);
-                assert contents != null;
-                for (ItemStack slot : contents.items()) {
-                    if (!slot.isEmpty()) {
-                        addItem(map, slot);
-                    }
-                }
-            }
+            //unsupport in 1.20.1
+//            if (itemStack.getItem() instanceof BundleItem) {
+//                BundleContents contents = itemStack.get(DataComponents.BUNDLE_CONTENTS);
+//                assert contents != null;
+//                for (ItemStack slot : contents.items()) {
+//                    if (!slot.isEmpty()) {
+//                        addItem(map, slot);
+//                    }
+//                }
+//            }
         }
 
         return map.values().stream().sorted((i1, i2) -> {
@@ -183,7 +182,7 @@ public class ContainerSummaryController {
 
         private static final int MAX_ROWS = 10;
         private static final int H_PADDING = 2;
-        private static final ResourceLocation CONTAINER_TEXTURE = ResourceLocation.parse("textures/gui/container/generic_54.png");
+        private static final ResourceLocation CONTAINER_TEXTURE = new ResourceLocation("textures/gui/container/generic_54.png");
 
         public List<ItemDrawable> list;
         public int width;

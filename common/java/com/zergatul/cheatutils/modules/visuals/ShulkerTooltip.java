@@ -24,7 +24,7 @@ public class ShulkerTooltip {
 
     public static ShulkerTooltip instance = new ShulkerTooltip();
 
-    private static final ResourceLocation CONTAINER_TEXTURE = ResourceLocation.parse("textures/gui/container/shulker_box.png");
+    private static final ResourceLocation CONTAINER_TEXTURE = new ResourceLocation("textures/gui/container/shulker_box.png");
     private static final int ImageWidth = 176;
     private static final int ImageHeight = 166;
     private static final int TranslateZ = 250;

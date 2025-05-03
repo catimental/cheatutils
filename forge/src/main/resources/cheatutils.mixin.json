@@ -10,14 +10,13 @@
   },
   "mixinPriority": 500,
   "client": [
-    "common.accessors.AbstractRecipeBookScreenAccessor",
+    "common.accessors.CraftingScreenAccessor",
     "common.accessors.BlockBehaviourAccessor",
     "common.accessors.ChunkAccessAccessor",
     "common.accessors.ClientChunkCacheAccessor",
     "common.accessors.ClientChunkCacheStorageAccessor",
     "common.accessors.ClientLevelAccessor",
     "common.accessors.ClientPacketListenerAccessor",
-    "common.accessors.ColorParticleOptionAccessor",
     "common.accessors.CompositeRenderTypeAccessor",
     "common.accessors.CompositeStateAccessor",
     "common.accessors.CrossbowItemAccessor",
@@ -91,7 +90,6 @@
     "forge.MixinKeyMapping",
     "forge.MixinLevelRenderer",
     "forge.MixinLightTexture",
-    "forge.MixinModVersions",
     "forge.MixinMultiPlayerGameMode"
   ]
 }
