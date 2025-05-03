@@ -15,6 +15,18 @@ public class ColorApi {
         return String.format("#%02X%02X%02X", red, green, blue);
     }
 
+    @HelpText("""
+            Creates hex encoded string from RGBA values. Example output: "#12345680"
+            """)
+    public String toHex(int red, int green, int blue, int alpha) {
+        red = MathUtils.clamp(red, 0, 255);
+        green = MathUtils.clamp(green, 0, 255);
+        blue = MathUtils.clamp(blue, 0, 255);
+        alpha = MathUtils.clamp(alpha, 0, 255);
+        return String.format("#%02X%02X%02X%02X", red, green, blue, alpha);
+    }
+
+
     @HelpText("value should be [0..1]")
     public String gradient(String color1, String color2, double value) {
         value = MathUtils.clamp(value, 0, 1);
