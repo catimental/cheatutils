@@ -25,6 +25,8 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.Locale;
 
+
+//partially done
 public class PlayerApi {
 
     private final static Minecraft mc = Minecraft.getInstance();
