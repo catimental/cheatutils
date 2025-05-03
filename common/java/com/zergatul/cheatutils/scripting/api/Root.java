@@ -66,6 +66,10 @@ public class Root {
     public static PacketApi packet = new PacketApi();
     public static WindowApi window = new WindowApi();
     public static FontApi font = new FontApi();
+    public static CameraApi camera = new CameraApi();
+    public static ClipboardApi clipboard = new ClipboardApi();
+    public static DelayApi delay = new DelayApi();
+    public static VariablesApi variablesApi = new VariablesApi();
 
     // specific
     public static CurrentBlockApi currentBlock = new CurrentBlockApi();

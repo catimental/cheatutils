@@ -18,11 +18,16 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.*;
+import org.joml.Vector3d;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 
 
@@ -30,6 +35,7 @@ import java.util.Locale;
 public class PlayerApi {
 
     private final static Minecraft mc = Minecraft.getInstance();
+    public TargetApi target = new TargetApi();
 //    private final static Minecraft mc = Minecraft.getInstance();
 
 //    public TargetApi target = new TargetApi();
@@ -382,4 +388,170 @@ public class PlayerApi {
                 .map(BlockPosWrapper::new)
                 .toArray(BlockPosWrapper[]::new);
     }
+
+    public static class TargetApi {
+
+        public boolean hasBlock() {
+            if (mc.hitResult == null) {
+                return false;
+            }
+
+            return mc.hitResult.getType() == HitResult.Type.BLOCK;
+        }
+
+        public BlockPosWrapper getBlockPos() {
+            if (mc.hitResult instanceof BlockHitResult hitResult) {
+                return new BlockPosWrapper(hitResult.getBlockPos());
+            } else {
+                return new BlockPosWrapper(0, 0, 0);
+            }
+        }
+
+        public int getBlockX() {
+            if (mc.hitResult instanceof BlockHitResult hitResult) {
+                return hitResult.getBlockPos().getX();
+            } else {
+                return Integer.MIN_VALUE;
+            }
+        }
+
+        public int getBlockY() {
+            if (mc.hitResult instanceof BlockHitResult hitResult) {
+                return hitResult.getBlockPos().getY();
+            } else {
+                return Integer.MIN_VALUE;
+            }
+        }
+
+        public int getBlockZ() {
+            if (mc.hitResult instanceof BlockHitResult hitResult) {
+                return hitResult.getBlockPos().getZ();
+            } else {
+                return Integer.MIN_VALUE;
+            }
+        }
+
+        public boolean hasEntity() {
+            if (mc.hitResult == null) {
+                return false;
+            }
+
+            return mc.hitResult.getType() == HitResult.Type.ENTITY;
+        }
+
+        public int getEntityId() {
+            if (mc.hitResult instanceof EntityHitResult hitResult) {
+                return hitResult.getEntity().getId();
+            } else {
+                return Integer.MIN_VALUE;
+            }
+        }
+
+        public String getBlockCoordinatesFormatted() {
+            if (mc.level == null) {
+                return "";
+            }
+
+            Entity entity = mc.getCameraEntity();
+            if (entity == null) {
+                return "";
+            }
+
+            HitResult result = entity.pick(20.0D, 0.0F, false);
+            if (result.getType() == HitResult.Type.BLOCK) {
+                BlockPos blockPos = ((BlockHitResult) result).getBlockPos();
+                return blockPos.getX() + ", " + blockPos.getY() + ", " + blockPos.getZ();
+            } else {
+                return "";
+            }
+        }
+
+        public String getBlockName() {
+            if (mc.level == null) {
+                return "";
+            }
+
+            Entity entity = mc.getCameraEntity();
+            if (entity == null) {
+                return "";
+            }
+
+            HitResult result = entity.pick(20.0D, 0.0F, false);
+            if (result.getType() == HitResult.Type.BLOCK) {
+                BlockPos blockPos = ((BlockHitResult) result).getBlockPos();
+                BlockState blockState = mc.level.getBlockState(blockPos);
+                return com.zergatul.cheatutils.common.Registries.BLOCKS.getKey(blockState.getBlock()).toString();
+            } else {
+                return "";
+            }
+        }
+
+        public BlockPosWrapper getBlockPosInRange(double maxRange, boolean captureFluids) {
+            if (mc.level == null || mc.player == null) {
+                return new BlockPosWrapper(Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE);
+            }
+
+            HitResult result = mc.player.pick(maxRange, 0, captureFluids);
+            if (result instanceof BlockHitResult hitResult && hitResult.getType() == HitResult.Type.BLOCK) {
+                return new BlockPosWrapper(hitResult.getBlockPos());
+            } else {
+                return new BlockPosWrapper(Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE);
+            }
+        }
+
+        public int getEntityInNearestCursor() {
+            return getEntityInNearestCursor(1000, 100);
+        }
+
+        @HelpText("""
+                카메라의 시점에서 가장 가까운 엔티티id를 반환합니다.
+                """)
+        public int getEntityInNearestCursor(double maxDistance, float maxAngle) {
+            if (mc.level == null || mc.player == null) {
+                return Integer.MIN_VALUE;
+            }
+
+            // Get player eye position and look vector
+            Vec3 eyePos = mc.player.getEyePosition();
+            Vec3 lookVec = mc.player.getViewVector(1.0F).normalize();
+
+
+            // Get entities within range
+            AABB searchBox = new AABB(
+                    eyePos.x - maxDistance, eyePos.y - maxDistance, eyePos.z - maxDistance,
+                    eyePos.x + maxDistance, eyePos.y + maxDistance, eyePos.z + maxDistance);
+
+            List<Entity> entities = mc.level.getEntities(mc.player, searchBox,
+                    entity -> entity instanceof LivingEntity && entity != mc.player && entity.isAlive());
+            return entities.stream()
+                    .filter(entity -> {
+                        // Calculate vector to entity center
+                        Vec3 toEntity = entity.getBoundingBox().getCenter().subtract(eyePos).normalize();
+
+                        // Calculate angle between look vector and entity vector
+                        double dot = lookVec.dot(toEntity);
+                        float angle = (float) Math.toDegrees(Math.acos(dot));
+
+                        // Filter by angle
+                        return angle <= maxAngle;
+                    })
+                    .min(Comparator.<Entity>comparingDouble(entity -> {
+                        // Calculate angle
+                        Vec3 toEntity = entity.getBoundingBox().getCenter().subtract(eyePos).normalize();
+                        double dot = lookVec.dot(toEntity);
+                        float angle = (float) Math.toDegrees(Math.acos(dot));
+
+                        // Calculate distance
+                        double distance = entity.distanceTo(mc.player);
+
+                        // Prioritize angle over distance with a weighting factor
+                        return angle * 100 + distance;
+                    }))
+                    .map(Entity::getId)
+                    .orElse(Integer.MIN_VALUE);
+        }
+    }
+
+
+
 }
