@@ -8,6 +8,7 @@ import com.zergatul.cheatutils.scripting.api.ApiType;
 import com.zergatul.cheatutils.scripting.api.HelpText;
 import com.zergatul.cheatutils.scripting.types.BlockPosWrapper;
 import com.zergatul.cheatutils.scripting.types.Position3d;
+import com.zergatul.cheatutils.utils.EntityUtils;
 import com.zergatul.cheatutils.utils.NearbyBlockEnumerator;
 import com.zergatul.cheatutils.utils.Rotation;
 import com.zergatul.cheatutils.utils.RotationUtils;
@@ -296,6 +297,15 @@ public class PlayerApi {
         mc.player.setYRot(rotation.yRot());
     }
 
+    public void lookAtWithRotation(double x, double y, double z, double xRot, double yRot) {
+        if (mc.player == null) {
+            return;
+        }
+        Rotation rotation = RotationUtils.getRotation(mc.player.getEyePosition(), new Vec3(x, y, z));
+        mc.player.setXRot((float) xRot);
+        mc.player.setYRot((float) yRot);
+    }
+
     @HelpText("""
             Allowed disconnect types: "self-attack", "invalid-chars". Anything else (for example "") - normal disconnect.
             """)
@@ -503,6 +513,9 @@ public class PlayerApi {
             return getEntityInNearestCursor(1000, 100);
         }
 
+        List<String> EGNORED_ENTITIES = List.of(
+
+        );
         @HelpText("""
                 카메라의 시점에서 가장 가까운 엔티티id를 반환합니다.
                 """)
@@ -524,6 +537,14 @@ public class PlayerApi {
             List<Entity> entities = mc.level.getEntities(mc.player, searchBox,
                     entity -> entity instanceof LivingEntity && entity != mc.player && entity.isAlive());
             return entities.stream()
+                    .filter(entity -> !EGNORED_ENTITIES.contains(entity.getName().getString()))
+                    //remove block collision
+                    .filter(
+                            entity -> {
+                                AABB entityBox = entity.getBoundingBox();
+                                return !entityBox.intersects(searchBox);
+                            }
+                    )
                     .filter(entity -> {
                         // Calculate vector to entity center
                         Vec3 toEntity = entity.getBoundingBox().getCenter().subtract(eyePos).normalize();
