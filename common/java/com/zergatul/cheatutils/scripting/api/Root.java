@@ -69,8 +69,6 @@ public class Root {
     public static CameraApi camera = new CameraApi();
     public static ClipboardApi clipboard = new ClipboardApi();
     public static DelayApi delay = new DelayApi();
-    public static VariablesApi variablesApi = new VariablesApi();
-
     // specific
     public static CurrentBlockApi currentBlock = new CurrentBlockApi();
     public static BlockPlacerApi blockPlacer = new BlockPlacerApi();
