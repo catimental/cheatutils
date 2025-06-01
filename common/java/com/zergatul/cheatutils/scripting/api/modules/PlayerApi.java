@@ -1,5 +1,6 @@
 package com.zergatul.cheatutils.scripting.api.modules;
 
+import com.zergatul.cheatutils.common.Registries;
 import com.zergatul.cheatutils.controllers.DisconnectController;
 import com.zergatul.cheatutils.controllers.SpeedCounterController;
 import com.zergatul.cheatutils.mixins.common.accessors.MultiPlayerGameModeAccessor;
@@ -8,7 +9,6 @@ import com.zergatul.cheatutils.scripting.api.ApiType;
 import com.zergatul.cheatutils.scripting.api.HelpText;
 import com.zergatul.cheatutils.scripting.types.BlockPosWrapper;
 import com.zergatul.cheatutils.scripting.types.Position3d;
-import com.zergatul.cheatutils.utils.EntityUtils;
 import com.zergatul.cheatutils.utils.NearbyBlockEnumerator;
 import com.zergatul.cheatutils.utils.Rotation;
 import com.zergatul.cheatutils.utils.RotationUtils;
@@ -21,15 +21,16 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.*;
-import org.joml.Vector3d;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.function.Predicate;
 
 
 //partially done
@@ -297,6 +298,40 @@ public class PlayerApi {
         mc.player.setYRot(rotation.yRot());
     }
 
+    @ApiVisibility(ApiType.ACTION)
+    public boolean lookAtEntityHead(int entityId) {
+        if (mc.player == null) {
+            return false;
+        }
+        Entity entity = mc.level.getEntity(entityId);
+        if (entity == null) {
+            return false;
+        }
+
+        Vec3 headPos = getEntityHeadPosition(entity);
+//        Rotation rotation = RotationUtils.getRotation(mc.player.getEyePosition(), headPos);
+//        mc.player.setXRot(rotation.xRot());
+//        mc.player.setYRot(rotation.yRot());
+        lookAt(headPos.x, headPos.y, headPos.z);
+        return true;
+    }
+
+    @ApiVisibility(ApiType.ACTION)
+    public boolean lookAtEntityCenter(int entityId) {
+        if (mc.player == null) {
+            return false;
+        }
+        Entity entity = mc.level.getEntity(entityId);
+        if (entity == null) {
+            return false;
+        }
+
+        Vec3 centerPos = getEntityCenterPosition(entity);
+        lookAt(centerPos.x, centerPos.y, centerPos.z);
+        return true;
+    }
+
+    @ApiVisibility(ApiType.ACTION)
     public void lookAtWithRotation(double x, double y, double z, double xRot, double yRot) {
         if (mc.player == null) {
             return;
@@ -513,8 +548,8 @@ public class PlayerApi {
             return getEntityInNearestCursor(1000, 100);
         }
 
-        List<String> EGNORED_ENTITIES = List.of(
-
+        private static List<String> IGNORE_ENTITY_LIST = List.of(
+                "spore:scent"
         );
         @HelpText("""
                 카메라의 시점에서 가장 가까운 엔티티id를 반환합니다.
@@ -537,23 +572,47 @@ public class PlayerApi {
             List<Entity> entities = mc.level.getEntities(mc.player, searchBox,
                     entity -> entity instanceof LivingEntity && entity != mc.player && entity.isAlive());
             return entities.stream()
-                    .filter(entity -> !EGNORED_ENTITIES.contains(entity.getName().getString()))
-                    //remove block collision
-                    .filter(
-                            entity -> {
-                                AABB entityBox = entity.getBoundingBox();
-                                return !entityBox.intersects(searchBox);
-                            }
-                    )
+                    //simple filter
                     .filter(entity -> {
-                        // Calculate vector to entity center
+                        // check if entity is in ignore list
+                        final String type = Registries.ENTITY_TYPES.getKey(entity.getType()).toString();
+                        for (String ignore : IGNORE_ENTITY_LIST) {
+                            if (type.contains(ignore)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    })
+                    //block collision check
+                    .filter(entity -> {
+                        // get entity center
+                        Vec3 entityCenter = entity.getBoundingBox().getCenter();
+
+                        // laycasting
+                        Vec3 toEntity = entityCenter.subtract(eyePos);
+                        double distance = toEntity.length();
+
+                        // is colliding with a block?
+                        BlockHitResult blockHit = mc.level.clip(new ClipContext(
+                                eyePos,
+                                entityCenter,
+                                ClipContext.Block.COLLIDER,
+                                ClipContext.Fluid.NONE,
+                                mc.player));
+
+                        // check if the block hit is not the entity itself
+                        return blockHit.getType() == HitResult.Type.MISS ||
+                                blockHit.getLocation().distanceTo(eyePos) > distance;
+                    })
+                    .filter(entity -> {
+                        // calculate vector to entity center
                         Vec3 toEntity = entity.getBoundingBox().getCenter().subtract(eyePos).normalize();
 
-                        // Calculate angle between look vector and entity vector
+                        // calculate angle between look vector and entity vector
                         double dot = lookVec.dot(toEntity);
                         float angle = (float) Math.toDegrees(Math.acos(dot));
 
-                        // Filter by angle
+                        // filter by angle
                         return angle <= maxAngle;
                     })
                     .min(Comparator.<Entity>comparingDouble(entity -> {
@@ -562,17 +621,219 @@ public class PlayerApi {
                         double dot = lookVec.dot(toEntity);
                         float angle = (float) Math.toDegrees(Math.acos(dot));
 
-                        // Calculate distance
+                        // calculate distance
                         double distance = entity.distanceTo(mc.player);
 
-                        // Prioritize angle over distance with a weighting factor
+                        // prioritize angle over distance with a weighting factor
                         return angle * 100 + distance;
                     }))
                     .map(Entity::getId)
                     .orElse(Integer.MIN_VALUE);
         }
+
+        /**
+         * 플레이어의 크로스헤어(커서)에 있는 엔티티의 ID를 반환합니다.
+         * 블록과의 충돌을 고려하며, 특정 블록은 무시할 수 있습니다.
+         *
+         * @param maxDistance 최대 확인 거리
+         * @return 커서에 있는 엔티티의 ID, 없으면 Integer.MIN_VALUE
+         */
+        @ApiVisibility(ApiType.ACTION)
+        public int getEntityUnderCursor(double maxDistance) {
+            return getEntityUnderCursor(maxDistance, Blocks.GRASS, Blocks.TALL_GRASS);
+        }
+
+        /**
+         * 플레이어의 크로스헤어(커서)에 있는 엔티티의 ID를 반환합니다.
+         * 블록과의 충돌을 고려하며, 특정 블록은 무시할 수 있습니다.
+         *
+         * @param maxDistance 최대 확인 거리
+         * @param ignoredBlocks 무시할 블록 목록 (선택사항)
+         * @return 커서에 있는 엔티티의 ID, 없으면 Integer.MIN_VALUE
+         */
+        @ApiVisibility(ApiType.ACTION)
+        public int getEntityUnderCursor(double maxDistance, Block... ignoredBlocks) {
+            if (mc.level == null || mc.player == null) {
+                return Integer.MIN_VALUE;
+            }
+
+            // 무시할 블록 셋 생성
+            Set<Block> ignoredBlockSet = new HashSet<>();
+            if (ignoredBlocks != null) {
+                Collections.addAll(ignoredBlockSet, ignoredBlocks);
+            }
+
+            // 플레이어 시선 정보 가져오기
+            Vec3 eyePos = mc.player.getEyePosition();
+            Vec3 lookVec = mc.player.getViewVector(1.0F);
+            Vec3 endPos = eyePos.add(lookVec.scale(maxDistance));
+
+            // 엔티티 충돌 확인용 레이 생성
+            EntityHitResult entityHit = null;
+            BlockHitResult blockHit = null;
+
+            // 블록 충돌 확인
+            blockHit = mc.level.clip(new ClipContext(
+                    eyePos,
+                    endPos,
+                    ClipContext.Block.COLLIDER,
+                    ClipContext.Fluid.NONE,
+                    mc.player));
+
+            // 블록 충돌이 있고, 그 블록이 무시 목록에 없다면
+            boolean blockHitValid = false;
+            if (blockHit.getType() != HitResult.Type.MISS) {
+                BlockPos blockPos = blockHit.getBlockPos();
+                Block hitBlock = mc.level.getBlockState(blockPos).getBlock();
+
+                // 블록이 무시 목록에 없으면 유효한 충돌로 간주
+                blockHitValid = !ignoredBlockSet.contains(hitBlock);
+            }
+
+            // 블록 충돌 거리 계산 (충돌이 없거나 무시된 경우 최대 거리로 설정)
+            double blockHitDistance = blockHitValid ?
+                    blockHit.getLocation().distanceTo(eyePos) : maxDistance;
+
+            // 엔티티 충돌 확인
+            // 모든 엔티티에 대해 레이 충돌 검사
+            List<Entity> entities = mc.level.getEntities(mc.player,
+                    mc.player.getBoundingBox().inflate(maxDistance),
+                    entity -> entity instanceof LivingEntity && entity != mc.player && entity.isAlive());
+
+            Entity closestEntity = null;
+            double closestDistance = Double.MAX_VALUE;
+
+            for (Entity entity : entities) {
+                final String type = Registries.ENTITY_TYPES.getKey(entity.getType()).toString();
+                if(IGNORE_ENTITY_LIST.contains(type)) {
+                    continue;
+                }
+                // 엔티티의 히트박스와 레이의 충돌 확인
+                AABB box = entity.getBoundingBox();
+                Optional<Vec3> hitOptional = box.clip(eyePos, endPos);
+
+                if (hitOptional.isPresent()) {
+                    Vec3 hitPos = hitOptional.get();
+                    double distance = eyePos.distanceTo(hitPos);
+
+                    // 블록 충돌보다 가까워야 함
+                    if (distance < closestDistance && distance < blockHitDistance) {
+                        closestEntity = entity;
+                        closestDistance = distance;
+                    }
+                }
+            }
+
+            return closestEntity != null ? closestEntity.getId() : Integer.MIN_VALUE;
+        }
+
+        /**
+         * 플레이어의 크로스헤어(커서)에 있는 엔티티의 ID를 반환합니다.
+         * 블록과의 충돌을 고려하며, 특정 블록 타입은 무시할 수 있습니다.
+         *
+         * @param maxDistance 최대 확인 거리
+         * @return 커서에 있는 엔티티의 ID, 없으면 Integer.MIN_VALUE
+         */
+        @ApiVisibility(ApiType.ACTION)
+        public int getEntityUnderCursorWithPredicate(double maxDistance) {
+            return getEntityUnderCursorWithPredicate(maxDistance, blockState -> false);
+        }
+
+        /**
+         * 플레이어의 크로스헤어(커서)에 있는 엔티티의 ID를 반환합니다.
+         * 블록과의 충돌을 고려하며, 특정 블록 타입은 무시할 수 있습니다.
+         *
+         * @param maxDistance 최대 확인 거리
+         * @param ignoredBlockTypes 무시할 블록 타입 목록 (BlockState Predicate)
+         * @return 커서에 있는 엔티티의 ID, 없으면 Integer.MIN_VALUE
+         */
+        @ApiVisibility(ApiType.ACTION)
+        public int getEntityUnderCursorWithPredicate(double maxDistance, Predicate<BlockState> ignoredBlockTypes) {
+            if (mc.level == null || mc.player == null || ignoredBlockTypes == null) {
+                return Integer.MIN_VALUE;
+            }
+
+            // 플레이어 시선 정보 가져오기
+            Vec3 eyePos = mc.player.getEyePosition();
+            Vec3 lookVec = mc.player.getViewVector(1.0F);
+            Vec3 endPos = eyePos.add(lookVec.scale(maxDistance));
+
+            // 블록 충돌 확인 (커스텀 블록 타입 필터링을 위한 클래스)
+            BlockHitResult blockHit = mc.level.clip(
+                    new ClipContext(
+                            eyePos,
+                            endPos,
+                            ClipContext.Block.COLLIDER,
+                            ClipContext.Fluid.NONE,
+                            mc.player
+                    )
+            );
+
+            // 블록 충돌이 있고, 그 블록이 무시 목록에 있는지 확인
+            boolean blockHitValid = false;
+            if (blockHit.getType() != HitResult.Type.MISS) {
+                BlockPos blockPos = blockHit.getBlockPos();
+                BlockState hitBlockState = mc.level.getBlockState(blockPos);
+
+                // 블록이 무시 목록에 있으면 충돌을 무시
+                blockHitValid = !ignoredBlockTypes.test(hitBlockState);
+            }
+
+            // 블록 충돌 거리 계산 (충돌이 없거나 무시된 경우 최대 거리로 설정)
+            double blockHitDistance = blockHitValid ?
+                    blockHit.getLocation().distanceTo(eyePos) : maxDistance;
+
+            // 엔티티 충돌 확인
+            List<Entity> entities = mc.level.getEntities(mc.player,
+                    mc.player.getBoundingBox().inflate(maxDistance),
+                    entity -> entity instanceof LivingEntity && entity != mc.player && entity.isAlive());
+
+            Entity closestEntity = null;
+            double closestDistance = Double.MAX_VALUE;
+
+            for (Entity entity : entities) {
+                // 엔티티의 히트박스와 레이의 충돌 확인
+                AABB box = entity.getBoundingBox();
+                Optional<Vec3> hitOptional = box.clip(eyePos, endPos);
+
+                if (hitOptional.isPresent()) {
+                    Vec3 hitPos = hitOptional.get();
+                    double distance = eyePos.distanceTo(hitPos);
+
+                    // 블록 충돌보다 가까워야 함
+                    if (distance < closestDistance && distance < blockHitDistance) {
+                        closestEntity = entity;
+                        closestDistance = distance;
+                    }
+                }
+            }
+
+            return closestEntity != null ? closestEntity.getId() : Integer.MIN_VALUE;
+        }
+
     }
 
+    private static Vec3 getEntityHeadPosition(Entity entity) {
+        if (entity == null) return null;
 
+        //return eyeposition if entity is LivingEntity
+        if (entity instanceof LivingEntity) {
+            return ((LivingEntity) entity).getEyePosition();
+        }
+
+        // else box center
+        AABB box = entity.getBoundingBox();
+        return new Vec3(
+                (box.minX + box.maxX) / 2,
+                box.maxY,
+                (box.minZ + box.maxZ) / 2
+        );
+    }
+
+    private static Vec3 getEntityCenterPosition(Entity entity) {
+        if (entity == null) return null;
+
+        return entity.getBoundingBox().getCenter();
+    }
 
 }

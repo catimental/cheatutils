@@ -408,15 +408,6 @@ public class EntitiesApi {
 //        return mc.level.noBlockCollision(null, type.getSpawnAABB(x + 0.5, y, z + 0.5));
 //    }
 
-    @HelpText("""
-                Returns bounding box (or hitbox in other words) for specified entity
-                """)
-    public BoundingBox getBoundingBox(int entityId) {
-        return getValue(
-                entityId,
-                entity -> new BoundingBox(entity.blockPosition()), //TODO: Test
-                () -> new BoundingBox(0, 0, 0, 0, 0, 0));
-    }
 
 //    private Function<Entity, ItemStackWrapper> getEquippedItem(EquipmentSlot slot) {
 //        return entity -> {
