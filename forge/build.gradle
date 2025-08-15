@@ -3,9 +3,11 @@ import java.nio.file.Paths
 buildscript {
     repositories {
         // These repositories are only for Gradle plugins, put any other repositories in the repository block further below
+
         maven { url = 'https://maven.minecraftforge.net' }
         maven { url = 'https://repo.spongepowered.org/maven' }
         mavenCentral()
+
     }
     dependencies {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
@@ -76,6 +78,14 @@ repositories {
     // flatDir {
     //     dir 'libs'
     // }
+    maven {
+        // Add curse maven to repositories
+        name = "Curse Maven"
+        url = "https://www.cursemaven.com"
+        content {
+            includeGroup "curse.maven"
+        }
+    }
 }
 
 dependencies {
@@ -102,6 +112,10 @@ dependencies {
     implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.3.6")) {
         jarJar.ranged(it, "[0.3.6,)")
     }
+
+    // If you want to use version tacz-1.20.1-1.1.6-release
+    implementation fg.deobf("curse.maven:timeless-and-classics-zero-1028108:6632240-sources-6633203")
+
 }
 
 mixin {

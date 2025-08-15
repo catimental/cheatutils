@@ -67,6 +67,7 @@ public class Config {
     public AreaMineConfig areaMineConfig = new AreaMineConfig();
     public ServerPluginsConfig serverPluginsConfig = new ServerPluginsConfig();
     public HitboxSizeConfig hitboxSizeConfig = new HitboxSizeConfig();
+    public TaczConfig taczConfig = new TaczConfig();
 
     public Config() {
         esp = true;
