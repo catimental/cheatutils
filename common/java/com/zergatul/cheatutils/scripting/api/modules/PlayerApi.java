@@ -20,6 +20,10 @@ import net.minecraft.core.Holder;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -396,6 +400,50 @@ public class PlayerApi {
         return 1d - mc.player.getAttackStrengthScale(0);
     }
 
+    @HelpText("Returns the attack damage of the currently held item.")
+    public double getAttackDamage() {
+        if (mc.player == null) {
+            return 0.0;
+        }
+
+        ItemStack mainHandItem = mc.player.getMainHandItem();
+        if (mainHandItem.isEmpty()) {
+            // Base attack damage without weapon (fist)
+            AttributeInstance attackDamage = mc.player.getAttribute(Attributes.ATTACK_DAMAGE);
+            return attackDamage != null ? attackDamage.getValue() : 1.0;
+        }
+
+        // Get attack damage from item attributes
+        double damage = mainHandItem.getAttributeModifiers(EquipmentSlot.MAINHAND)
+                .get(Attributes.ATTACK_DAMAGE)
+                .stream()
+                .mapToDouble(modifier -> modifier.getAmount())
+                .sum();
+
+        // Add base attack damage
+        AttributeInstance baseAttackDamage = mc.player.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (baseAttackDamage != null) {
+            damage += baseAttackDamage.getBaseValue();
+        }
+
+        return damage;
+    }
+
+    private boolean wouldEntityDieFromAttack(LivingEntity entity) {
+        if (entity == null) {
+            return false;
+        }
+
+        double attackDamage = getAttackDamage();
+        float currentHealth = entity.getHealth();
+
+        // Consider attack cooldown - if not fully charged, damage is reduced
+        double cooldownMultiplier = 1.0 - getAttackCooldown();
+        double effectiveDamage = attackDamage * cooldownMultiplier;
+
+        return currentHealth <= effectiveDamage;
+    }
+
     @HelpText("""
             Returns distance to entity.
             Uses the same algorithm as vanilla Minecraft when checking if entity is close enough for interaction.
@@ -548,13 +596,11 @@ public class PlayerApi {
             return getEntityInNearestCursor(1000, 100);
         }
 
-        private static List<String> IGNORE_ENTITY_LIST = List.of(
-                "spore:scent"
-        );
         @HelpText("""
                 카메라의 시점에서 가장 가까운 엔티티id를 반환합니다.
+                excludeDeadlyTargets가 true이면 총알이 발사되어 해당 엔티티의 체력이 0이 될 것으로 예상되는 엔티티는 제외합니다.
                 """)
-        public int getEntityInNearestCursor(double maxDistance, float maxAngle) {
+        public int getEntityInNearestCursor(double maxDistance, float maxAngle, boolean excludeDeadlyTargets) {
             if (mc.level == null || mc.player == null) {
                 return Integer.MIN_VALUE;
             }
@@ -615,6 +661,13 @@ public class PlayerApi {
                         // filter by angle
                         return angle <= maxAngle;
                     })
+                    // Filter out entities that would die from attack (if enabled)
+                    .filter(entity -> {
+//                        if (excludeDeadlyTargets && entity instanceof LivingEntity livingEntity) {
+//                            return !wouldEntityDieFromAttack(livingEntity);
+//                        }
+                        return true;
+                    })
                     .min(Comparator.<Entity>comparingDouble(entity -> {
                         // Calculate angle
                         Vec3 toEntity = entity.getBoundingBox().getCenter().subtract(eyePos).normalize();
@@ -629,6 +682,17 @@ public class PlayerApi {
                     }))
                     .map(Entity::getId)
                     .orElse(Integer.MIN_VALUE);
+        }
+
+        private static List<String> IGNORE_ENTITY_LIST = List.of(
+                "spore:scent"
+        );
+        @HelpText("""
+                카메라의 시점에서 가장 가까운 엔티티id를 반환합니다.
+                총알이 발사되어 해당 엔티티의 체력이 0이 될 것으로 예상되는 엔티티는 제외합니다.
+                """)
+        public int getEntityInNearestCursor(double maxDistance, float maxAngle) {
+            return getEntityInNearestCursor(maxDistance, maxAngle, true);
         }
 
         /**
