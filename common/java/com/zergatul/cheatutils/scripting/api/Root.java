@@ -1,6 +1,7 @@
 package com.zergatul.cheatutils.scripting.api;
 
 import com.zergatul.cheatutils.scripting.api.modules.*;
+import com.zergatul.cheatutils.scripting.api.modules.integrated.TaczApi;
 
 public class Root {
 
@@ -74,4 +75,7 @@ public class Root {
     // specific
     public static CurrentBlockApi currentBlock = new CurrentBlockApi();
     public static BlockPlacerApi blockPlacer = new BlockPlacerApi();
+
+    // TACZ
+    public static TaczApi tacz = new TaczApi();
 }

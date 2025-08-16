@@ -4,6 +4,7 @@ import com.zergatul.cheatutils.common.Registries;
 import com.zergatul.cheatutils.controllers.DisconnectController;
 import com.zergatul.cheatutils.controllers.SpeedCounterController;
 import com.zergatul.cheatutils.mixins.common.accessors.MultiPlayerGameModeAccessor;
+import com.zergatul.cheatutils.modules.tacz.TaczEntityTracker;
 import com.zergatul.cheatutils.scripting.api.ApiVisibility;
 import com.zergatul.cheatutils.scripting.api.ApiType;
 import com.zergatul.cheatutils.scripting.api.HelpText;
@@ -20,10 +21,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -313,6 +310,12 @@ public class PlayerApi {
         }
 
         Vec3 headPos = getEntityHeadPosition(entity);
+
+        if (!isPositionVisible(headPos)) {
+            return false;
+        }
+        //is headPos is visible
+
 //        Rotation rotation = RotationUtils.getRotation(mc.player.getEyePosition(), headPos);
 //        mc.player.setXRot(rotation.xRot());
 //        mc.player.setYRot(rotation.yRot());
@@ -331,7 +334,30 @@ public class PlayerApi {
         }
 
         Vec3 centerPos = getEntityCenterPosition(entity);
+
+        if (!isPositionVisible(centerPos)) {
+            return false;
+        }
         lookAt(centerPos.x, centerPos.y, centerPos.z);
+        return true;
+    }
+
+    @ApiVisibility(ApiType.ACTION)
+    public boolean lookAtEntityVisiblePosition(int entityId) {
+        if (mc.player == null) {
+            return false;
+        }
+        Entity entity = mc.level.getEntity(entityId);
+        if (entity == null) {
+            return false;
+        }
+
+        Vec3 visiblePos = findEntityVisiblePosition(entity);
+        if (visiblePos == null) {
+            return false;
+        }
+
+        lookAt(visiblePos.x, visiblePos.y, visiblePos.z);
         return true;
     }
 
@@ -398,50 +424,6 @@ public class PlayerApi {
             return Double.NaN;
         }
         return 1d - mc.player.getAttackStrengthScale(0);
-    }
-
-    @HelpText("Returns the attack damage of the currently held item.")
-    public double getAttackDamage() {
-        if (mc.player == null) {
-            return 0.0;
-        }
-
-        ItemStack mainHandItem = mc.player.getMainHandItem();
-        if (mainHandItem.isEmpty()) {
-            // Base attack damage without weapon (fist)
-            AttributeInstance attackDamage = mc.player.getAttribute(Attributes.ATTACK_DAMAGE);
-            return attackDamage != null ? attackDamage.getValue() : 1.0;
-        }
-
-        // Get attack damage from item attributes
-        double damage = mainHandItem.getAttributeModifiers(EquipmentSlot.MAINHAND)
-                .get(Attributes.ATTACK_DAMAGE)
-                .stream()
-                .mapToDouble(modifier -> modifier.getAmount())
-                .sum();
-
-        // Add base attack damage
-        AttributeInstance baseAttackDamage = mc.player.getAttribute(Attributes.ATTACK_DAMAGE);
-        if (baseAttackDamage != null) {
-            damage += baseAttackDamage.getBaseValue();
-        }
-
-        return damage;
-    }
-
-    private boolean wouldEntityDieFromAttack(LivingEntity entity) {
-        if (entity == null) {
-            return false;
-        }
-
-        double attackDamage = getAttackDamage();
-        float currentHealth = entity.getHealth();
-
-        // Consider attack cooldown - if not fully charged, damage is reduced
-        double cooldownMultiplier = 1.0 - getAttackCooldown();
-        double effectiveDamage = attackDamage * cooldownMultiplier;
-
-        return currentHealth <= effectiveDamage;
     }
 
     @HelpText("""
@@ -593,14 +575,21 @@ public class PlayerApi {
         }
 
         public int getEntityInNearestCursor() {
-            return getEntityInNearestCursor(1000, 100);
+            return getEntityInNearestCursor(1000, 100, true);
         }
 
+        public int getEntityInNearestCursorExpectDead() {
+            return getEntityInNearestCursor(1000, 100, false);
+        }
+
+        private static List<String> IGNORE_ENTITY_LIST = List.of(
+                "spore:scent",
+                "minecraft:player"
+        );
         @HelpText("""
                 카메라의 시점에서 가장 가까운 엔티티id를 반환합니다.
-                excludeDeadlyTargets가 true이면 총알이 발사되어 해당 엔티티의 체력이 0이 될 것으로 예상되는 엔티티는 제외합니다.
                 """)
-        public int getEntityInNearestCursor(double maxDistance, float maxAngle, boolean excludeDeadlyTargets) {
+        public int getEntityInNearestCursor(double maxDistance, float maxAngle, boolean isIgnoreExpectedDead) {
             if (mc.level == null || mc.player == null) {
                 return Integer.MIN_VALUE;
             }
@@ -616,7 +605,9 @@ public class PlayerApi {
                     eyePos.x + maxDistance, eyePos.y + maxDistance, eyePos.z + maxDistance);
 
             List<Entity> entities = mc.level.getEntities(mc.player, searchBox,
-                    entity -> entity instanceof LivingEntity && entity != mc.player && entity.isAlive());
+                    entity -> entity instanceof LivingEntity && entity != mc.player &&
+                                entity.isAlive() &&
+                            (isIgnoreExpectedDead || TaczEntityTracker.isEntityAlive(entity)));
             return entities.stream()
                     //simple filter
                     .filter(entity -> {
@@ -661,13 +652,6 @@ public class PlayerApi {
                         // filter by angle
                         return angle <= maxAngle;
                     })
-                    // Filter out entities that would die from attack (if enabled)
-                    .filter(entity -> {
-//                        if (excludeDeadlyTargets && entity instanceof LivingEntity livingEntity) {
-//                            return !wouldEntityDieFromAttack(livingEntity);
-//                        }
-                        return true;
-                    })
                     .min(Comparator.<Entity>comparingDouble(entity -> {
                         // Calculate angle
                         Vec3 toEntity = entity.getBoundingBox().getCenter().subtract(eyePos).normalize();
@@ -682,17 +666,6 @@ public class PlayerApi {
                     }))
                     .map(Entity::getId)
                     .orElse(Integer.MIN_VALUE);
-        }
-
-        private static List<String> IGNORE_ENTITY_LIST = List.of(
-                "spore:scent"
-        );
-        @HelpText("""
-                카메라의 시점에서 가장 가까운 엔티티id를 반환합니다.
-                총알이 발사되어 해당 엔티티의 체력이 0이 될 것으로 예상되는 엔티티는 제외합니다.
-                """)
-        public int getEntityInNearestCursor(double maxDistance, float maxAngle) {
-            return getEntityInNearestCursor(maxDistance, maxAngle, true);
         }
 
         /**
@@ -898,6 +871,87 @@ public class PlayerApi {
         if (entity == null) return null;
 
         return entity.getBoundingBox().getCenter();
+    }
+
+    private Vec3 findEntityVisiblePosition(Entity entity) {
+        if (mc.player == null || mc.level == null) {
+            return null;
+        }
+
+        AABB boundingBox = entity.getBoundingBox();
+        Vec3 eyePos = mc.player.getEyePosition();
+
+        // 성능 최적화를 위해 우선순위가 높은 위치부터 체크
+        // 1. 중앙 위치 (가장 일반적)
+        Vec3 centerPos = boundingBox.getCenter();
+        if (isPositionVisible(centerPos)) {
+            return centerPos;
+        }
+
+        // 2. 머리 위치 (LivingEntity의 경우)
+        if (entity instanceof net.minecraft.world.entity.LivingEntity) {
+            Vec3 headPos = getEntityHeadPosition(entity);
+            if (headPos != null && isPositionVisible(headPos)) {
+                return headPos;
+            }
+        }
+
+        // 3. 바운딩 박스의 주요 모서리들 체크 (성능을 위해 제한적으로)
+        Vec3[] keyPositions = {
+            new Vec3(boundingBox.minX, boundingBox.maxY, boundingBox.minZ), // 상단 모서리들
+            new Vec3(boundingBox.maxX, boundingBox.maxY, boundingBox.minZ),
+            new Vec3(boundingBox.minX, boundingBox.maxY, boundingBox.maxZ),
+            new Vec3(boundingBox.maxX, boundingBox.maxY, boundingBox.maxZ),
+            new Vec3(boundingBox.minX, boundingBox.minY, boundingBox.minZ), // 하단 모서리들
+            new Vec3(boundingBox.maxX, boundingBox.minY, boundingBox.minZ),
+            new Vec3(boundingBox.minX, boundingBox.minY, boundingBox.maxZ),
+            new Vec3(boundingBox.maxX, boundingBox.minY, boundingBox.maxZ)
+        };
+
+        for (Vec3 pos : keyPositions) {
+            if (isPositionVisible(pos)) {
+                return pos;
+            }
+        }
+
+        // 4. 마지막으로 바운딩 박스 면의 중앙점들 체크
+        Vec3[] facePositions = {
+            new Vec3(centerPos.x, boundingBox.maxY, centerPos.z), // 상단면
+            new Vec3(centerPos.x, boundingBox.minY, centerPos.z), // 하단면
+            new Vec3(boundingBox.minX, centerPos.y, centerPos.z), // 좌측면
+            new Vec3(boundingBox.maxX, centerPos.y, centerPos.z), // 우측면
+            new Vec3(centerPos.x, centerPos.y, boundingBox.minZ), // 앞면
+            new Vec3(centerPos.x, centerPos.y, boundingBox.maxZ)  // 뒷면
+        };
+
+        for (Vec3 pos : facePositions) {
+            if (isPositionVisible(pos)) {
+                return pos;
+            }
+        }
+
+        // 모든 위치가 가려져 있음
+        return null;
+    }
+
+    private boolean isPositionVisible(Vec3 targetPos) {
+        if (mc.player == null || mc.level == null) {
+            return false;
+        }
+
+        Vec3 eyePos = mc.player.getEyePosition();
+
+        // 레이캐스팅으로 블록 충돌 체크
+        BlockHitResult blockHit = mc.level.clip(new ClipContext(
+                eyePos,
+                targetPos,
+                ClipContext.Block.COLLIDER,
+                ClipContext.Fluid.NONE,
+                mc.player));
+
+        // 블록 충돌이 없거나, 충돌 지점이 타겟보다 멀리 있으면 보임
+        return blockHit.getType() == HitResult.Type.MISS ||
+                blockHit.getLocation().distanceTo(eyePos) >= targetPos.distanceTo(eyePos) - 0.1;
     }
 
 }
